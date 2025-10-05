@@ -1,0 +1,13 @@
+[package]
+name = "trx"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = "0.32.3"
+egui = "0.32.3"
+egui_heatmap = "0.4.5"
+egui_plot = "0.33.0"
+num-complex = "0.4.6"
+rustfft = "6.4.1"
+soapysdr = "0.4.2"
