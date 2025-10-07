@@ -65,21 +65,32 @@ impl eframe::App for HeatmapApp {
             vec![egui::Color32::BLACK; self.x_size as usize * self.y_size as usize],
         );
         let buff = self.buffer.lock().unwrap();
-        if buff.len() == 0 {
-            return;
-        } else {
-            if buff[0].len() == 0 {
-                return;
-            }
-        }
+        // if buff.len() == 0 {
+        //     return;
+        // } else {
+        //     if buff[0].len() == 0 {
+        //         return;
+        //     }
+        // }
         for y in 0..self.y_size {
             for x in 0..self.x_size {
-                let v = buff[y as usize][x as usize];
-                let intensity = (sigmoid(v) * 255.0) as u8;
+                let row = buff.get(y as usize);
+                if row.is_none() {
+                    return;
+                }
+                let pixel = row.unwrap().get(x as usize);
+                if pixel.is_none() {
+                    return;
+                }
+                // let v = buff[y as usize][x as usize];
+                let v = pixel.unwrap();
+                let intensity = (sigmoid(*v) * 255.0) as u8;
                 img[(x as usize, y as usize)] = egui::Color32::from_rgb(intensity, intensity, 0);
             }
         }
-
+        let font_family = egui::FontFamily::Monospace;
+        let font_id = egui::FontId::new(11.0, font_family);
+        let text_color = egui::Color32::from_rgb(255, 0, 0);
         let tex = ctx.load_texture("spectrogram", img, Default::default());
         let sized_tex = egui::load::SizedTexture::new(tex.id(), tex.size_vec2());
         let spec_tex = egui::Image::new(sized_tex);
@@ -92,6 +103,13 @@ impl eframe::App for HeatmapApp {
             ui.painter().line(points, stroke);
             points = vec![spec_rect.left_bottom(), spec_rect.right_top()];
             ui.painter().line(points, stroke);
+            ui.painter().text(
+                spec_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                "test",
+                font_id,
+                text_color,
+            );
         });
 
         ctx.request_repaint();
@@ -113,7 +131,7 @@ fn main() -> Result<(), eframe::Error> {
     let receive_gain = 0.0;
     let timeout_us = 1_000_000;
     let sample_len = 4096;
-    let x_size = 1024;
+    let x_size = 2048;
     let y_size = 720;
     let down_sample_ratio = (sample_len / x_size) as usize;
 
@@ -177,7 +195,7 @@ fn main() -> Result<(), eframe::Error> {
                 // ds_buff.push( / down_sample_ratio);
                 // let down_sample = data.push(buff[i].abs() as f64);
             }
-            println!("{}, {}, {}", x_size, max_size, abs_buff.len());
+            // println!("{}, {}, {}", x_size, max_size, abs_buff.len());
             // likely will need to run a notched filter over baseband
             // and capture off of center
             // data[0] = 0.0; // TODO: figure out how to handle the DC spike
