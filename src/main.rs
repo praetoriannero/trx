@@ -220,13 +220,29 @@ fn main() -> Result<(), eframe::Error> {
             for i in 0..abs_vec.len() {
                 spectral_density.spectrum[i] += abs_vec[i] as f64;
             }
-            let peaks: Vec<_> = spectral_density
-                .average_power()
+            let avg_power = spectral_density.average_power();
+            let peaks: Vec<_> = avg_power
+                .clone()
                 .into_iter()
                 .enumerate()
                 .peaks(PeaksDetector::new(30, 5.0, 0.0), |e| e.1 as f64)
                 .map(|((i, _), p)| (i, p))
                 .collect();
+            let mut peaks_actual: Vec<f64> = Vec::new();
+            let mut last_idx = 0usize;
+            let mut indices: Vec<f64> = Vec::new();
+            for (index, peak_type) in peaks.iter() {
+                if last_idx == 0 {
+                    last_idx = *index;
+                    continue;
+                }
+                if *index == last_idx + 1 {
+                    indices.push(avg_power[peaks[*index].0]);
+                } else {
+                    indices.clear();
+                }
+                println!("{:?} {:?}", index, peak_type);
+            }
             // println!("{:?}", peaks);
             for i in 0..x_size {
                 let j = i * down_sample_ratio as u64;
