@@ -3,7 +3,7 @@ use egui::{ColorImage, Pos2, TextureHandle, Widget};
 // use egui_plot::{Line, Plot};
 use num_complex::ComplexFloat;
 use rustfft::{FftPlanner, num_complex::Complex};
-use smoothed_z_score::{Peak, PeaksDetector};
+use smoothed_z_score::{Peak, PeaksDetector, PeaksFilter};
 use soapysdr;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -115,7 +115,22 @@ struct SdrConfig {
     receive_gain: f64,
     timeout_us: i64,
     sample_len: i64,
+    down_sample_ratio: usize,
     fft_bins: Vec<f64>,
+}
+
+struct SpectralDensity {
+    spectrum: Vec<f64>,
+    samples: i64,
+}
+
+impl SpectralDensity {
+    fn average_power(&self) -> Vec<f64> {
+        self.spectrum
+            .iter()
+            .map(|f| f / self.samples as f64)
+            .collect()
+    }
 }
 
 fn main() -> Result<(), eframe::Error> {
@@ -126,6 +141,7 @@ fn main() -> Result<(), eframe::Error> {
     let sample_len = 4096;
     let x_size = 2048;
     let y_size = 720;
+
     let down_sample_ratio = (sample_len / x_size) as usize;
     let fft_bins = fft_freqs(sample_len, 1.0 / sample_rate);
     let config = SdrConfig {
@@ -134,32 +150,45 @@ fn main() -> Result<(), eframe::Error> {
         receive_gain: receive_gain,
         timeout_us: timeout_us,
         sample_len: sample_len as i64,
+        down_sample_ratio: down_sample_ratio,
         fft_bins: fft_bins,
     };
 
     let rx_samples: Arc<Mutex<Vec<f64>>> =
-        Arc::new(Mutex::new(Vec::with_capacity(sample_len as usize)));
+        Arc::new(Mutex::new(Vec::with_capacity(config.sample_len as usize)));
     let rx_samples_clone = rx_samples.clone();
     let heatmap_deque: Arc<Mutex<VecDeque<Vec<f64>>>> =
         Arc::new(Mutex::new(VecDeque::with_capacity(y_size)));
     {
         let mut buff = heatmap_deque.lock().unwrap();
         for _ in 0..y_size {
-            let row: Vec<f64> = Vec::with_capacity(sample_len as usize);
+            let row: Vec<f64> = Vec::with_capacity(config.sample_len as usize);
             buff.push_front(row);
         }
     }
     let heatmap_clone = heatmap_deque.clone();
+    let detected_signals: Arc<Mutex<Vec<Signal>>> =
+        Arc::new(Mutex::new(Vec::with_capacity(config.sample_len as usize)));
+
+    // Start SDR thread
     thread::spawn(move || {
         println!("Spawning SDR thread");
         let sdr = soapysdr::Device::new("driver=hackrf").expect("HackRF not found");
-        sdr.set_frequency(soapysdr::Direction::Rx, 0, center_freq, ())
+        sdr.set_frequency(soapysdr::Direction::Rx, 0, config.center_freq, ())
             .unwrap();
-        sdr.set_sample_rate(soapysdr::Direction::Rx, 0, sample_rate)
+        sdr.set_sample_rate(soapysdr::Direction::Rx, 0, config.sample_rate)
             .unwrap();
-        sdr.set_gain(soapysdr::Direction::Rx, 0, receive_gain)
+        sdr.set_gain(soapysdr::Direction::Rx, 0, config.receive_gain)
             .unwrap();
 
+        let mut spectral_sum: Vec<f64> = Vec::with_capacity(sample_len as usize);
+        for _ in 0..sample_len {
+            spectral_sum.push(0.0);
+        }
+        let mut spectral_density = SpectralDensity {
+            spectrum: spectral_sum,
+            samples: 0,
+        };
         let mut rx = sdr.rx_stream::<Complex<f32>>(&[0]).unwrap();
         rx.activate(None).unwrap();
 
@@ -173,7 +202,8 @@ fn main() -> Result<(), eframe::Error> {
             sample_len as usize
         ];
         loop {
-            let _ = rx.read(&mut [&mut buff], timeout_us).unwrap_or(0);
+            spectral_density.samples += 1;
+            let _ = rx.read(&mut [&mut buff], config.timeout_us).unwrap_or(0);
             let mut data = rx_samples_clone.lock().unwrap();
             fft.process(&mut buff);
             data.clear();
@@ -185,6 +215,19 @@ fn main() -> Result<(), eframe::Error> {
             for f in 0..abs_buff.len() / 2 {
                 ordered_buff.push(abs_buff[f]);
             }
+            let abs_vec: Vec<f32> = buff.iter().map(|c| c.abs() as f32).collect();
+            // println!("{} {}", abs_vec.len(), spectral_density.spectrum.len());
+            for i in 0..abs_vec.len() {
+                spectral_density.spectrum[i] += abs_vec[i] as f64;
+            }
+            let peaks: Vec<_> = spectral_density
+                .average_power()
+                .into_iter()
+                .enumerate()
+                .peaks(PeaksDetector::new(30, 5.0, 0.0), |e| e.1 as f64)
+                .map(|((i, _), p)| (i, p))
+                .collect();
+            // println!("{:?}", peaks);
             for i in 0..x_size {
                 let j = i * down_sample_ratio as u64;
                 let k = (i + 1) * down_sample_ratio as u64;
@@ -194,10 +237,7 @@ fn main() -> Result<(), eframe::Error> {
                     .sum();
                 let mean = sum / down_sample_ratio as f32;
                 data.push(mean as f64);
-                // ds_buff.push( / down_sample_ratio);
-                // let down_sample = data.push(buff[i].abs() as f64);
             }
-            // println!("{}, {}, {}", x_size, max_size, abs_buff.len());
             // likely will need to run a notched filter over baseband
             // and capture off of center
             // data[0] = 0.0; // TODO: figure out how to handle the DC spike
@@ -207,13 +247,17 @@ fn main() -> Result<(), eframe::Error> {
                     hm_result.pop_back();
                     let row = data
                         .iter()
-                        // .map(|x| x.abs() as f64)
                         .map(|x| 10.0 * x.abs().log(10.0) as f64)
                         .collect();
                     hm_result.push_front(row);
                 }
                 Err(_) => continue,
             };
+            // for i in 0..y_size {
+            //     for j in 0..x_size {
+            //         continue;
+            //     }
+            // }
         }
     });
 
