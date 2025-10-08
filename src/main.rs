@@ -150,8 +150,6 @@ fn main() -> Result<(), eframe::Error> {
         }
     }
     let heatmap_clone = heatmap_deque.clone();
-    // let freqbins = fft_freqs(7u64, 0.1);
-    // println!("{:?}", freqbins);
     thread::spawn(move || {
         println!("Spawning SDR thread");
         let sdr = soapysdr::Device::new("driver=hackrf").expect("HackRF not found");
@@ -187,12 +185,13 @@ fn main() -> Result<(), eframe::Error> {
             for f in 0..abs_buff.len() / 2 {
                 ordered_buff.push(abs_buff[f]);
             }
-            let mut max_size = 0;
             for i in 0..x_size {
-                let j = i * down_sample_ratio;
-                let k = (i + 1) * down_sample_ratio;
-                max_size = k;
-                let sum: f32 = ordered_buff[j..k].iter().map(|x| *x).sum();
+                let j = i * down_sample_ratio as u64;
+                let k = (i + 1) * down_sample_ratio as u64;
+                let sum: f32 = ordered_buff[j as usize..k as usize]
+                    .iter()
+                    .map(|x| *x)
+                    .sum();
                 let mean = sum / down_sample_ratio as f32;
                 data.push(mean as f64);
                 // ds_buff.push( / down_sample_ratio);
