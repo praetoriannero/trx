@@ -1,8 +1,9 @@
 use eframe::egui;
 use egui::{ColorImage, Pos2, TextureHandle, Widget};
-use egui_plot::{Line, Plot};
+// use egui_plot::{Line, Plot};
 use num_complex::ComplexFloat;
 use rustfft::{FftPlanner, num_complex::Complex};
+use smoothed_z_score::{Peak, PeaksDetector};
 use soapysdr;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -65,13 +66,6 @@ impl eframe::App for HeatmapApp {
             vec![egui::Color32::BLACK; self.x_size as usize * self.y_size as usize],
         );
         let buff = self.buffer.lock().unwrap();
-        // if buff.len() == 0 {
-        //     return;
-        // } else {
-        //     if buff[0].len() == 0 {
-        //         return;
-        //     }
-        // }
         for y in 0..self.y_size {
             for x in 0..self.x_size {
                 let row = buff.get(y as usize);
@@ -82,7 +76,6 @@ impl eframe::App for HeatmapApp {
                 if pixel.is_none() {
                     return;
                 }
-                // let v = buff[y as usize][x as usize];
                 let v = pixel.unwrap();
                 let intensity = (sigmoid(*v) * 255.0) as u8;
                 img[(x as usize, y as usize)] = egui::Color32::from_rgb(intensity, intensity, 0);
@@ -122,7 +115,7 @@ struct SdrConfig {
     receive_gain: f64,
     timeout_us: i64,
     sample_len: i64,
-    time_slices: i64,
+    fft_bins: Vec<f64>,
 }
 
 fn main() -> Result<(), eframe::Error> {
@@ -134,15 +127,25 @@ fn main() -> Result<(), eframe::Error> {
     let x_size = 2048;
     let y_size = 720;
     let down_sample_ratio = (sample_len / x_size) as usize;
+    let fft_bins = fft_freqs(sample_len, 1.0 / sample_rate);
+    let config = SdrConfig {
+        center_freq: center_freq,
+        sample_rate: sample_rate,
+        receive_gain: receive_gain,
+        timeout_us: timeout_us,
+        sample_len: sample_len as i64,
+        fft_bins: fft_bins,
+    };
 
-    let rx_samples: Arc<Mutex<Vec<f64>>> = Arc::new(Mutex::new(Vec::with_capacity(sample_len)));
+    let rx_samples: Arc<Mutex<Vec<f64>>> =
+        Arc::new(Mutex::new(Vec::with_capacity(sample_len as usize)));
     let rx_samples_clone = rx_samples.clone();
     let heatmap_deque: Arc<Mutex<VecDeque<Vec<f64>>>> =
         Arc::new(Mutex::new(VecDeque::with_capacity(y_size)));
     {
         let mut buff = heatmap_deque.lock().unwrap();
         for _ in 0..y_size {
-            let row: Vec<f64> = Vec::with_capacity(sample_len);
+            let row: Vec<f64> = Vec::with_capacity(sample_len as usize);
             buff.push_front(row);
         }
     }
@@ -163,13 +166,13 @@ fn main() -> Result<(), eframe::Error> {
         rx.activate(None).unwrap();
 
         let mut planner: FftPlanner<f32> = FftPlanner::new();
-        let fft = planner.plan_fft_forward(sample_len);
+        let fft = planner.plan_fft_forward(sample_len as usize);
         let mut buff = vec![
             Complex {
                 re: 0.0f32,
                 im: 0.0f32
             };
-            sample_len
+            sample_len as usize
         ];
         loop {
             let _ = rx.read(&mut [&mut buff], timeout_us).unwrap_or(0);
