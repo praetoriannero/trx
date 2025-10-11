@@ -6,27 +6,30 @@ mod app;
 mod sdr;
 mod signal;
 
+use signal::Signal;
+
 fn main() -> Result<(), eframe::Error> {
     let config = sdr::SdrConfig::default();
-    // let rx_samples: Arc<Mutex<Vec<f64>>> =
-    //     Arc::new(Mutex::new(Vec::with_capacity(config.sample_len as usize)));
-    // let rx_samples_clone = rx_samples.clone();
-    let heatmap_deque: Arc<Mutex<VecDeque<Vec<f64>>>> =
+    let heatmap: Arc<Mutex<VecDeque<Vec<f64>>>> =
         Arc::new(Mutex::new(VecDeque::with_capacity(config.y_size)));
     {
-        let mut buff = heatmap_deque.lock().unwrap();
+        let mut buff = heatmap.lock().unwrap();
         for _ in 0..config.y_size {
-            let row: Vec<f64> = Vec::with_capacity(config.sample_len as usize);
+            let mut row: Vec<f64> = Vec::new();
+            for _ in 0..config.x_size {
+                row.push(0.0);
+            }
             buff.push_front(row);
         }
     }
-    let heatmap_clone = heatmap_deque.clone();
-    sdr::spawn_listener(config.clone(), heatmap_clone);
+    let found_signals: Arc<Mutex<Vec<Signal>>> = Arc::new(Mutex::new(Vec::new()));
+    sdr::spawn_listener(config.clone(), heatmap.clone(), found_signals.clone());
     // let app = VisualizerApp { samples: samples };
     let app = app::HeatmapApp {
-        buffer: heatmap_deque,
+        buffer: heatmap,
         x_size: config.x_size as i64,
         y_size: config.y_size as i64,
+        detected_signals: found_signals,
     };
     let viewport = egui::ViewportBuilder {
         inner_size: Some(egui::Vec2::new(
