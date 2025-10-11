@@ -48,7 +48,7 @@ impl eframe::App for HeatmapApp {
         let sized_tex = egui::load::SizedTexture::new(tex.id(), tex.size_vec2());
         let spec_tex = Image::new(sized_tex);
         let stroke = Stroke::new(1.0, Color32::from_rgb(0, 127, 255));
-
+        let bw_stroke = Stroke::new(1.0, Color32::from_rgb(0, 127, 0));
         // Start draw
         CentralPanel::default().show(ctx, |ui| {
             let response = ui.add(spec_tex);
@@ -56,12 +56,23 @@ impl eframe::App for HeatmapApp {
             let x_offset = spec_rect.left();
             let y_min = spec_rect.top();
             let y_max = spec_rect.bottom();
+            let y_range = y_min..=y_max;
             let signals = self.detected_signals.lock().unwrap();
 
             for signal in signals.iter() {
                 let bin = signal.freq_idx;
                 ui.painter()
-                    .vline(bin as f32 + x_offset, y_min..=y_max, stroke);
+                    .vline(bin as f32 + x_offset, y_range.clone(), stroke);
+                ui.painter().vline(
+                    signal.lower_freq_idx as f32 + x_offset,
+                    y_range.clone(),
+                    bw_stroke,
+                );
+                ui.painter().vline(
+                    signal.upper_freq_idx as f32 + x_offset,
+                    y_range.clone(),
+                    bw_stroke,
+                );
                 let text_pos = egui::Pos2 {
                     x: bin as f32 + x_offset,
                     y: spec_rect.center().y,

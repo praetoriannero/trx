@@ -34,9 +34,9 @@ pub fn fft_freqs(samples: u64, duration: f64) -> Vec<f64> {
     ordered_freqs
 }
 
-pub fn nearest_neighbor(vector: Vec<f64>, value: f64) -> usize {
+pub fn nearest_neighbor(vector: &Vec<f64>, value: f64) -> usize {
     let mut nearest: usize = 0;
-    let mut diff = value - f64::INFINITY;
+    let mut diff = (value - f64::INFINITY).abs();
     for idx in 0..vector.len() {
         let idx_diff = (value - vector[idx]).abs();
         if idx_diff < diff {
@@ -50,6 +50,8 @@ pub fn nearest_neighbor(vector: Vec<f64>, value: f64) -> usize {
 pub struct Signal {
     pub freq_idx: usize,
     pub center_frequency: f64,
+    pub lower_freq_idx: usize,
+    pub upper_freq_idx: usize,
     pub bandwidth: f64,
 }
 

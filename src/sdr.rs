@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
-use crate::signal::{Signal, downsample, fft_freqs, gaussian_filter_1d};
+use crate::signal::{Signal, downsample, fft_freqs, gaussian_filter_1d, nearest_neighbor};
 
 #[derive(Clone)]
 pub struct SdrConfig {
@@ -29,9 +29,9 @@ impl SdrConfig {
             receive_gain: 10.0,
             timeout_us: 1_000_000,
             sample_len: buff_size,
-            threshold: 0.275,
+            threshold: 0.35,
             x_size: 1024,
-            y_size: 720,
+            y_size: 256,
             fft_bins: fft_freqs(buff_size as u64, 1.0 / sample_rate),
         }
     }
@@ -123,7 +123,7 @@ pub fn spawn_listener(
             spectrum.push_back(ordered_buff.iter().copied().collect());
             let (data, idx_map) = downsample::<f32>(&ordered_buff, config.x_size);
 
-            let mut avg_power = vec![0.0_f32; 4096];
+            let mut avg_power = vec![0.0_f32; config.sample_len as usize];
             let slices = config.y_size;
             if heartbeat.elapsed().unwrap() > time::Duration::new(1, 0) {
                 for row in 0..slices {
@@ -135,18 +135,18 @@ pub fn spawn_listener(
                     avg_power[col] /= slices as f32;
                 }
                 avg_power = gaussian_filter_1d(&avg_power, 10.0);
-                println!(
-                    "min power {}",
-                    avg_power
-                        .iter()
-                        .fold(f32::INFINITY, |current_min, &val| current_min.min(val))
-                );
-                println!(
-                    "max power {}",
-                    avg_power
-                        .iter()
-                        .fold(f32::NEG_INFINITY, |current_max, &val| current_max.max(val))
-                );
+                // println!(
+                //     "min power {}",
+                //     avg_power
+                //         .iter()
+                //         .fold(f32::INFINITY, |current_min, &val| current_min.min(val))
+                // );
+                // println!(
+                //     "max power {}",
+                //     avg_power
+                //         .iter()
+                //         .fold(f32::NEG_INFINITY, |current_max, &val| current_max.max(val))
+                // );
                 let mut peaks = Vec::<usize>::new();
                 for idx in 0..avg_power.len() {
                     if avg_power[idx] > config.threshold as f32 {
@@ -161,7 +161,6 @@ pub fn spawn_listener(
                             indices.push(*index);
                             continue;
                         } else {
-                            println!("{:?}", indices);
                             let index_precise: f32 =
                                 indices.iter().sum::<usize>() as f32 / indices.len() as f32;
                             let index_ceil = index_precise as usize;
@@ -172,14 +171,20 @@ pub fn spawn_listener(
                     indices.push(*index);
                 }
 
-                println!("PA {:?}", peaks_actual);
                 {
                     let mut signals = found_signals.lock().unwrap();
                     signals.clear();
                     for index in peaks_actual {
+                        let upper_idx =
+                            nearest_neighbor(&config.fft_bins, config.fft_bins[index] + 75_000.0);
+                        let lower_idx =
+                            nearest_neighbor(&config.fft_bins, config.fft_bins[index] - 75_000.0);
+                        let center_freq = config.fft_bins[index];
                         signals.push(Signal {
                             freq_idx: idx_map[index],
-                            center_frequency: config.fft_bins[index],
+                            center_frequency: center_freq,
+                            upper_freq_idx: idx_map[upper_idx],
+                            lower_freq_idx: idx_map[lower_idx],
                             bandwidth: 0.0,
                         });
                     }
