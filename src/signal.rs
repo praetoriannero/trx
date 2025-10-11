@@ -34,6 +34,19 @@ pub fn fft_freqs(samples: u64, duration: f64) -> Vec<f64> {
     ordered_freqs
 }
 
+pub fn nearest_neighbor(vector: Vec<f64>, value: f64) -> usize {
+    let mut nearest: usize = 0;
+    let mut diff = value - f64::INFINITY;
+    for idx in 0..vector.len() {
+        let idx_diff = (value - vector[idx]).abs();
+        if idx_diff < diff {
+            nearest = idx;
+            diff = idx_diff;
+        }
+    }
+    nearest
+}
+
 pub struct Signal {
     pub freq_idx: usize,
     pub center_frequency: f64,
@@ -42,7 +55,7 @@ pub struct Signal {
 
 fn gaussian_kernel(sigma: f32) -> Vec<f32> {
     assert!(sigma > 0.0);
-    let radius = (sigma * 3.0).ceil() as usize; // cover ~99.7% of area
+    let radius = (sigma * 3.0).ceil() as usize;
     let size = radius * 2 + 1;
     let mut kernel = Vec::with_capacity(size);
 

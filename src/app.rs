@@ -53,21 +53,11 @@ impl eframe::App for HeatmapApp {
         CentralPanel::default().show(ctx, |ui| {
             let response = ui.add(spec_tex);
             let spec_rect: Rect = response.rect;
-            // let mut points = vec![spec_rect.left_top(), spec_rect.right_bottom()];
-            // ui.painter().line(points, stroke);
-            // points = vec![spec_rect.left_bottom(), spec_rect.right_top()];
-            // ui.painter().line(points, stroke);
-            // ui.painter().text(
-            //     spec_rect.center(),
-            //     Align2::CENTER_CENTER,
-            //     "test",
-            //     font_id,
-            //     text_color,
-            // );
             let x_offset = spec_rect.left();
             let y_min = spec_rect.top();
             let y_max = spec_rect.bottom();
             let signals = self.detected_signals.lock().unwrap();
+
             for signal in signals.iter() {
                 let bin = signal.freq_idx;
                 ui.painter()
