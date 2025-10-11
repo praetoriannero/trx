@@ -63,6 +63,7 @@ impl SdrConfig {
 //         }
 //     });
 // }
+static FM_BANDWIDTH: f32 = 75_000.0;
 
 pub fn spawn_listener(
     config: SdrConfig,
@@ -106,6 +107,7 @@ pub fn spawn_listener(
         let mut data = Vec::<f64>::new();
         let mut heartbeat = time::SystemTime::now();
 
+        // let mut center_freq = config.center_freq;
         loop {
             let _ = rx.read(&mut [&mut buff], config.timeout_us).unwrap_or(0);
             fft.process(&mut buff);
@@ -126,6 +128,9 @@ pub fn spawn_listener(
             let mut avg_power = vec![0.0_f32; config.sample_len as usize];
             let slices = config.y_size;
             if heartbeat.elapsed().unwrap() > time::Duration::new(1, 0) {
+                // dev.set_frequency(soapysdr::Direction::Rx, 0, center_freq, ())
+                //     .unwrap();
+                // center_freq += 100_000.0;
                 for row in 0..slices {
                     for col in 0..spectrum[row].len() {
                         avg_power[col] += spectrum[row][col];
@@ -175,10 +180,14 @@ pub fn spawn_listener(
                     let mut signals = found_signals.lock().unwrap();
                     signals.clear();
                     for index in peaks_actual {
-                        let upper_idx =
-                            nearest_neighbor(&config.fft_bins, config.fft_bins[index] + 75_000.0);
-                        let lower_idx =
-                            nearest_neighbor(&config.fft_bins, config.fft_bins[index] - 75_000.0);
+                        let upper_idx = nearest_neighbor(
+                            &config.fft_bins,
+                            config.fft_bins[index] + FM_BANDWIDTH as f64,
+                        );
+                        let lower_idx = nearest_neighbor(
+                            &config.fft_bins,
+                            config.fft_bins[index] - FM_BANDWIDTH as f64,
+                        );
                         let center_freq = config.fft_bins[index];
                         signals.push(Signal {
                             freq_idx: idx_map[index],
