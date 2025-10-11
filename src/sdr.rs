@@ -189,6 +189,7 @@ pub fn spawn_listener(
                     for index in peaks_actual {
                         signals.push(Signal {
                             freq_idx: idx_map[index],
+                            center_frequency: config.fft_bins[index],
                             bandwidth: 0.0,
                         });
                     }

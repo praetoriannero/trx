@@ -30,6 +30,7 @@ fn main() -> Result<(), eframe::Error> {
         x_size: config.x_size as i64,
         y_size: config.y_size as i64,
         detected_signals: found_signals,
+        center_frequency: config.center_freq as f32,
     };
     let viewport = egui::ViewportBuilder {
         inner_size: Some(egui::Vec2::new(

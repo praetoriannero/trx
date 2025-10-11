@@ -24,11 +24,19 @@ pub fn fft_freqs(samples: u64, duration: f64) -> Vec<f64> {
             freqs.push(f);
         }
     };
-    freqs
+    let mut ordered_freqs = Vec::new();
+    for f in freqs.len() / 2..freqs.len() {
+        ordered_freqs.push(freqs[f]);
+    }
+    for f in 0..freqs.len() / 2 {
+        ordered_freqs.push(freqs[f]);
+    }
+    ordered_freqs
 }
 
 pub struct Signal {
     pub freq_idx: usize,
+    pub center_frequency: f64,
     pub bandwidth: f64,
 }
 

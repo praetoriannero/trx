@@ -13,6 +13,7 @@ pub struct HeatmapApp {
     pub x_size: i64,
     pub y_size: i64,
     pub detected_signals: Arc<Mutex<Vec<Signal>>>,
+    pub center_frequency: f32,
 }
 
 impl eframe::App for HeatmapApp {
@@ -42,7 +43,7 @@ impl eframe::App for HeatmapApp {
         }
         // let font_family = FontFamily::Monospace;
         // let font_id = FontId::new(11.0, font_family);
-        // let text_color = Color32::from_rgb(255, 0, 0);
+        let text_color = Color32::from_rgb(255, 0, 0);
         let tex = ctx.load_texture("spectrogram", img, Default::default());
         let sized_tex = egui::load::SizedTexture::new(tex.id(), tex.size_vec2());
         let spec_tex = Image::new(sized_tex);
@@ -71,6 +72,22 @@ impl eframe::App for HeatmapApp {
                 let bin = signal.freq_idx;
                 ui.painter()
                     .vline(bin as f32 + x_offset, y_min..=y_max, stroke);
+                let text_pos = egui::Pos2 {
+                    x: bin as f32 + x_offset,
+                    y: spec_rect.center().y,
+                };
+                let font_family = FontFamily::Monospace;
+                let font_id = FontId::new(12.0, font_family);
+                ui.painter().text(
+                    text_pos,
+                    Align2::CENTER_CENTER,
+                    format!(
+                        "{:3.3}",
+                        (self.center_frequency as f64 + signal.center_frequency) / 1_000_000.0
+                    ),
+                    font_id,
+                    text_color,
+                );
             }
         });
 
