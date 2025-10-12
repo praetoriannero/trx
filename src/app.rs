@@ -16,8 +16,15 @@ pub struct HeatmapApp {
     pub center_frequency: f32,
 }
 
-impl eframe::App for HeatmapApp {
-    fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+trait Render {
+    fn draw_spectrogram(&mut self, ctx: &egui::Context, _: &mut eframe::Frame);
+    fn draw_constellation(&mut self);
+    fn draw_time_series(&mut self);
+    fn draw_controls(&mut self);
+}
+
+impl Render for HeatmapApp {
+    fn draw_spectrogram(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         let mut img = ColorImage::new(
             [self.x_size as usize, self.y_size as usize],
             vec![egui::Color32::BLACK; self.x_size as usize * self.y_size as usize],
@@ -91,7 +98,21 @@ impl eframe::App for HeatmapApp {
                 );
             }
         });
+    }
+    fn draw_constellation(&mut self) {
+        todo!();
+    }
+    fn draw_time_series(&mut self) {
+        todo!();
+    }
+    fn draw_controls(&mut self) {
+        todo!();
+    }
+}
 
+impl eframe::App for HeatmapApp {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.draw_spectrogram(ctx, frame);
         ctx.request_repaint();
     }
 }

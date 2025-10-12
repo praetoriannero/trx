@@ -43,7 +43,7 @@ fn main() {
 
     // Create a sine wave at 440Hz
     let source = SineWave {
-        freq: 440.0,
+        freq: 400.0,
         sample_rate: 44100,
         t: 0.0,
     };

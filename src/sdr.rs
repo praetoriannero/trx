@@ -21,7 +21,7 @@ pub struct SdrConfig {
 
 impl SdrConfig {
     pub fn default() -> Self {
-        let sample_rate = 10_000_000.0;
+        let sample_rate = 20_000_000.0;
         let buff_size = 4096;
         SdrConfig {
             center_freq: 103_000_000.0,
@@ -29,7 +29,7 @@ impl SdrConfig {
             receive_gain: 10.0,
             timeout_us: 1_000_000,
             sample_len: buff_size,
-            threshold: 0.35,
+            threshold: 0.33,
             x_size: 1024,
             y_size: 256,
             fft_bins: fft_freqs(buff_size as u64, 1.0 / sample_rate),
