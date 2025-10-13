@@ -1,6 +1,18 @@
 use num_traits::{NumCast, Zero};
 use std::ops::{Add, Div};
 
+pub fn normalize_vec(vector: &mut Vec<f64>) {
+    let norm = vector
+        .iter()
+        .copied()
+        .filter(|x| !x.is_nan())
+        .max_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap();
+    for i in 0..vector.len() {
+        vector[i] = vector[i] / norm;
+    }
+}
+
 pub fn fft_freqs(samples: u64, duration: f64) -> Vec<f64> {
     let mut freqs: Vec<f64> = Vec::new();
     if samples % 2 == 0 {

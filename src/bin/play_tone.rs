@@ -1,4 +1,5 @@
 use rodio::{OutputStreamBuilder, Sink, Source};
+use soapysdr::{Device, Direction};
 use std::f32::consts::PI;
 use std::time::Duration;
 
@@ -40,6 +41,13 @@ impl Source for SineWave {
 fn main() {
     let outstream = OutputStreamBuilder::open_default_stream().unwrap();
     let sink = Sink::connect_new(&outstream.mixer());
+
+    // let dev = Device::new("driver=hackrf").expect("HackRF not found");
+    // dev.set_frequency(Direction::Rx, 0, config.center_freq, ())
+    //     .unwrap();
+    // dev.set_sample_rate(Direction::Rx, 0, config.sample_rate)
+    //     .unwrap();
+    // dev.set_gain(Direction::Rx, 0, config.receive_gain).unwrap();
 
     // Create a sine wave at 440Hz
     let source = SineWave {

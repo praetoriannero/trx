@@ -1,10 +1,13 @@
 use num_complex::ComplexFloat;
 use rustfft::{FftPlanner, num_complex::Complex};
+use soapysdr::{Device, Direction};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
-use crate::signal::{Signal, downsample, fft_freqs, gaussian_filter_1d, nearest_neighbor};
+use crate::signal::{
+    Signal, downsample, fft_freqs, gaussian_filter_1d, nearest_neighbor, normalize_vec,
+};
 
 #[derive(Clone)]
 pub struct SdrConfig {
@@ -24,7 +27,7 @@ impl SdrConfig {
         let sample_rate = 8_000_000.0;
         let buff_size = 4096;
         SdrConfig {
-            center_freq: 103_000_000.0,
+            center_freq: 102_500_000.0,
             sample_rate: sample_rate,
             receive_gain: 10.0,
             timeout_us: 1_000_000,
@@ -41,18 +44,18 @@ static FM_BANDWIDTH: f32 = 75_000.0;
 
 pub fn spawn_listener(
     config: SdrConfig,
+    time_series: Arc<Mutex<Vec<f64>>>,
     heatmap_deque: Arc<Mutex<VecDeque<Vec<f64>>>>,
     found_signals: Arc<Mutex<Vec<Signal>>>,
 ) {
     thread::spawn(move || {
         println!("Spawning SDR thread");
-        let dev = soapysdr::Device::new("driver=hackrf").expect("HackRF not found");
-        dev.set_frequency(soapysdr::Direction::Rx, 0, config.center_freq, ())
+        let dev = Device::new("driver=hackrf").expect("HackRF not found");
+        dev.set_frequency(Direction::Rx, 0, config.center_freq, ())
             .unwrap();
-        dev.set_sample_rate(soapysdr::Direction::Rx, 0, config.sample_rate)
+        dev.set_sample_rate(Direction::Rx, 0, config.sample_rate)
             .unwrap();
-        dev.set_gain(soapysdr::Direction::Rx, 0, config.receive_gain)
-            .unwrap();
+        dev.set_gain(Direction::Rx, 0, config.receive_gain).unwrap();
 
         let mut spectrum: VecDeque<Vec<f32>> = VecDeque::new();
         for _ in 0..config.y_size {
@@ -98,11 +101,18 @@ pub fn spawn_listener(
             spectrum.pop_front();
             spectrum.push_back(ordered_buff.iter().copied().collect());
             let (data, idx_map) = downsample::<f32>(&ordered_buff, config.x_size);
+            {
+                let mut ts = time_series.lock().unwrap();
+                ts.clear();
+                for val in data.clone() {
+                    ts.push(val.abs() as f64 * 10.0);
+                }
+            }
 
             let mut avg_power = vec![0.0_f32; config.sample_len as usize];
             let slices = config.y_size;
             if heartbeat.elapsed().unwrap() > time::Duration::new(1, 0) {
-                // dev.set_frequency(soapysdr::Direction::Rx, 0, center_freq, ())
+                // dev.set_frequency(Direction::Rx, 0, center_freq, ())
                 //     .unwrap();
                 // center_freq += 100_000.0;
                 for row in 0..slices {

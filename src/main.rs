@@ -10,6 +10,7 @@ use signal::Signal;
 
 fn main() -> Result<(), eframe::Error> {
     let config = sdr::SdrConfig::default();
+    let time_series = Arc::new(Mutex::new(vec![0.0f64; config.sample_len as usize]));
     let heatmap: Arc<Mutex<VecDeque<Vec<f64>>>> =
         Arc::new(Mutex::new(VecDeque::with_capacity(config.y_size)));
     {
@@ -23,13 +24,20 @@ fn main() -> Result<(), eframe::Error> {
         }
     }
     let found_signals: Arc<Mutex<Vec<Signal>>> = Arc::new(Mutex::new(Vec::new()));
-    sdr::spawn_listener(config.clone(), heatmap.clone(), found_signals.clone());
+    sdr::spawn_listener(
+        config.clone(),
+        time_series.clone(),
+        heatmap.clone(),
+        found_signals.clone(),
+    );
     // let app = VisualizerApp { samples: samples };
     let app = app::HeatmapApp {
         buffer: heatmap,
         x_size: config.x_size as i64,
         y_size: (config.y_size / 2) as i64,
+        threshold: config.threshold,
         detected_signals: found_signals,
+        time_series: time_series,
         center_frequency: config.center_freq as f32,
     };
     let viewport = egui::ViewportBuilder {
@@ -71,18 +79,6 @@ fn main() -> Result<(), eframe::Error> {
 //         averages.push(average);
 //     }
 //     averages
-// }
-
-// fn normalize_vec(vector: &mut Vec<f64>) {
-//     let norm = vector
-//         .iter()
-//         .copied()
-//         .filter(|x| !x.is_nan())
-//         .max_by(|a, b| a.partial_cmp(b).unwrap())
-//         .unwrap();
-//     for i in 0..vector.len() {
-//         vector[i] = vector[i] / norm;
-//     }
 // }
 
 // struct VisualizerApp {

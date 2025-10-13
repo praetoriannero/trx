@@ -10,8 +10,10 @@ fn sigmoid(x: f64) -> f64 {
 
 pub struct HeatmapApp {
     pub buffer: Arc<Mutex<VecDeque<Vec<f64>>>>,
+    pub time_series: Arc<Mutex<Vec<f64>>>,
     pub x_size: i64,
     pub y_size: i64,
+    pub threshold: f64,
     pub detected_signals: Arc<Mutex<Vec<Signal>>>,
     pub center_frequency: f32,
 }
@@ -126,6 +128,7 @@ impl Render for HeatmapApp {
             });
         Some(win_response.unwrap().response)
     }
+
     fn draw_time_series(
         &mut self,
         ctx: &egui::Context,
@@ -133,7 +136,8 @@ impl Render for HeatmapApp {
         parent_rect: &egui::Rect,
     ) -> Option<egui::Response> {
         let mut response: Option<egui::Response> = None;
-        egui::Window::new("Time Series")
+        let bw_stroke = Stroke::new(1.0, Color32::from_rgb(0, 127, 0));
+        egui::Window::new("FFT")
             .fixed_pos(parent_rect.left_bottom())
             .collapsible(false)
             .show(ctx, |ui| {
@@ -148,9 +152,33 @@ impl Render for HeatmapApp {
                 let sized_tex = egui::load::SizedTexture::new(tex.id(), tex.size_vec2());
                 let spec_tex = Image::new(sized_tex);
                 response = Some(ui.add(spec_tex));
+                let spec_rect = response.clone().unwrap().rect;
+                let x_offset = spec_rect.left();
+                let y_offset = spec_rect.bottom();
+                {
+                    let sig_vec = self.time_series.lock().unwrap();
+                    let thickness = 2 as f32;
+                    let color = Color32::from_rgb(255, 255, 0);
+                    let points: Vec<egui::Pos2> = (0..sig_vec.len())
+                        .map(|idx| {
+                            egui::Pos2::new(idx as f32 + x_offset, -sig_vec[idx] as f32 + y_offset)
+                        })
+                        .collect();
+                    let shape = egui::epaint::Shape::line(
+                        points,
+                        egui::epaint::PathStroke::new(thickness, color),
+                    );
+                    ui.painter().add(shape);
+                }
+                ui.painter().hline(
+                    spec_rect.left()..=spec_rect.right(),
+                    spec_rect.bottom() - (self.threshold as f32 * 10.0),
+                    bw_stroke,
+                );
             });
         response
     }
+
     fn draw_constellation(
         &mut self,
         ctx: &egui::Context,
@@ -159,6 +187,7 @@ impl Render for HeatmapApp {
     ) -> Option<egui::Response> {
         None
     }
+
     fn draw_controls(
         &mut self,
         ctx: &egui::Context,
@@ -181,7 +210,7 @@ impl eframe::App for HeatmapApp {
         self.draw_constellation(ctx, frame, &parent_rect);
         self.draw_controls(ctx, frame, &parent_rect);
         let mut inner_size: egui::Vec2 = ctx.used_size();
-        inner_size.y += 1.0;
+        inner_size.y += 5.0;
         ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(inner_size));
         ctx.request_repaint();
     }
