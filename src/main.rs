@@ -28,15 +28,16 @@ fn main() -> Result<(), eframe::Error> {
     let app = app::HeatmapApp {
         buffer: heatmap,
         x_size: config.x_size as i64,
-        y_size: config.y_size as i64,
+        y_size: (config.y_size / 2) as i64,
         detected_signals: found_signals,
         center_frequency: config.center_freq as f32,
     };
     let viewport = egui::ViewportBuilder {
-        inner_size: Some(egui::Vec2::new(
-            config.x_size as f32 + 16.0,
-            config.y_size as f32 + 16.0,
-        )),
+        // resizable: Some(false),
+        // inner_size: Some(egui::Vec2::new(
+        //     config.x_size as f32 + 16.0,
+        //     config.y_size as f32 + 16.0,
+        // )),
         ..Default::default()
     };
     let options = eframe::NativeOptions {

@@ -21,7 +21,7 @@ pub struct SdrConfig {
 
 impl SdrConfig {
     pub fn default() -> Self {
-        let sample_rate = 20_000_000.0;
+        let sample_rate = 8_000_000.0;
         let buff_size = 4096;
         SdrConfig {
             center_freq: 103_000_000.0,
@@ -31,38 +31,12 @@ impl SdrConfig {
             sample_len: buff_size,
             threshold: 0.33,
             x_size: 1024,
-            y_size: 256,
+            y_size: 512,
             fft_bins: fft_freqs(buff_size as u64, 1.0 / sample_rate),
         }
     }
 }
 
-// fn find_peaks(spectrum: Arc<Mutex<Vec<f32>>>, found_signals: Arc<Mutex<Vec<Signal>>>) {
-//     thread::spawn(move || {
-//         loop {
-//             let delay = 1;
-//             thread::sleep(time::Duration::from_secs(delay));
-//             let mut avg_power = vec![0.0_f32; 4096];
-// let slices = 20;
-// for row in 0..slices {
-//     for col in 0..spectrum[row].len() {
-//         avg_power[col] += spectrum[row][col];
-//     }
-// }
-// for col in 0..avg_power.len() {
-//     avg_power[col] /= slices as f32;
-// }
-//
-// let peaks: Vec<_> = avg_power
-//     .clone()
-//     .into_iter()
-//     .enumerate()
-//     .peaks(PeaksDetector::new(30, 5.0, 0.0), |e| e.1 as f64)
-//     .map(|((i, _), p)| (i, p))
-//     .collect();
-//         }
-//     });
-// }
 static FM_BANDWIDTH: f32 = 75_000.0;
 
 pub fn spawn_listener(
